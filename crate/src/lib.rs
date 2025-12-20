@@ -1,3 +1,6 @@
+mod utils;
+mod ga;
+
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
