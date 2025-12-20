@@ -1,5 +1,7 @@
 // crate/src/ga.rs
 
+use rand::Rng;
+
 pub struct Individual {
 	pub dna: Vec<u8>,
 	pub fitness: f64,
@@ -26,6 +28,16 @@ impl Individual {
 		}
 		self.fitness = 1.0 / (total_diff as f64 + 1.0);
 	}
+
+	pub fn mutate(&mut self, mutation_rate: f64) {
+		let mut rng: rand::prelude::ThreadRng = rand::thread_rng();
+
+		for val in self.dna.iter_mut() {
+			if rng.gen::<f64>() < mutation_rate {
+				*val = rng.gen_range(0..=255)
+			};
+		};
+	}
 }
 
 #[cfg(test)]
@@ -46,5 +58,14 @@ mod tests {
 		ind.calculate_fitness(&target);
 
 		assert_eq!(ind.fitness, 1.0);
+	}
+
+	#[test]
+	fn test_mutation_changes_dna() {
+		let mut ind: Individual = Individual::new();
+		ind.mutate(1.0);
+
+		let is_changed: bool = ind.dna.iter().any(|&x| x != 0);
+		assert!(is_changed, "DNA should change when mutation rate is 1.0");
 	}
 }
