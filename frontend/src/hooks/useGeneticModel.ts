@@ -56,7 +56,8 @@ export const useGeneticModel = () => {
     const setup = async () => {
       try {
         await init();
-        const targetData = await loadTargetImage('/target.png', IMAGE_SIZE, IMAGE_SIZE);
+        const targetUrl = `${import.meta.env.BASE_URL}target.png`;
+        const targetData = await loadTargetImage(targetUrl, IMAGE_SIZE, IMAGE_SIZE);
 
         modelRef.current = GeneticModel.new(targetData, 100);
 
@@ -89,7 +90,9 @@ export const useGeneticModel = () => {
     stopLoop();
     setIsPlaying(false);
 
-    const targetData = await loadTargetImage('/target.png', IMAGE_SIZE, IMAGE_SIZE);
+    const targetUrl = `${import.meta.env.BASE_URL}target.png`;
+    const targetData = await loadTargetImage(targetUrl, IMAGE_SIZE, IMAGE_SIZE);
+
     modelRef.current = GeneticModel.new(targetData, 100);
 
     setGeneration(0);

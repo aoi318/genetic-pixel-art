@@ -3,6 +3,7 @@ import { useGeneticModel } from './hooks/useGeneticModel';
 import { MosaicCanvas } from './components/MosaicCanvas';
 import { ControlPanel } from './components/ControlPanel';
 
+
 function App() {
   const {
     generation,
@@ -28,7 +29,7 @@ function App() {
             <div style={styles.imageWrapper}>
               <div style={styles.imageLabel}>Target</div>
               <img
-                src="/target.png"
+                src={`${import.meta.env.BASE_URL}target.png`}
                 alt="Target"
                 style={styles.pixelImage}
               />
