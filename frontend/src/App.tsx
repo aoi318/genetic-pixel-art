@@ -1,26 +1,116 @@
-import { useEffect } from 'react'
-import * as wasm from "crate" 
+// src/App.tsx
+import { useGeneticModel } from './hooks/useGeneticModel';
+import { MosaicCanvas } from './components/MosaicCanvas';
+import { ControlPanel } from './components/ControlPanel';
 
-export default function App() {
-  useEffect(() => {
-    // 複雑な async 処理をやめて、直接呼んでみる
-    try {
-      console.log("Wasm modules:", wasm);
-      // greet が存在するかチェックしてから実行
-      if (wasm.greet) {
-        wasm.greet("WebAssembly");
-      } else {
-        console.error("greet function not found in wasm module");
-      }
-    } catch (err) {
-      console.error("Wasm execution failed:", err);
-    }
-  }, []);
+function App() {
+  const {
+    generation,
+    fitness,
+    bestImage,
+    isPlaying,
+    isLoaded,
+    speed,
+    setSpeed,
+    togglePlay,
+    reset,
+  } = useGeneticModel();
 
   return (
-    <div style={{ padding: "20px", textAlign: "center" }}>
-      <h1>Rust + Wasm + React GA Project</h1>
-      <p>ブラウザのアラートが表示されたら疎通成功です！</p>
+    <div style={styles.container}>
+      <h1 style={styles.title}>🧬 Genetic Pixel Art</h1>
+
+      {!isLoaded ? (
+        <div style={styles.loading}>Loading WebAssembly...</div>
+      ) : (
+        <div style={styles.content}>
+          <div style={styles.imagesContainer}>
+            <div style={styles.imageWrapper}>
+              <div style={styles.imageLabel}>Target</div>
+              <img
+                src="/target.png"
+                alt="Target"
+                style={styles.pixelImage}
+              />
+            </div>
+
+            <div style={styles.imageWrapper}>
+              <div style={styles.imageLabel}>Evolution</div>
+              <MosaicCanvas
+                imageData={bestImage}
+                width={32}
+                height={32}
+              />
+            </div>
+          </div>
+
+          <ControlPanel
+            isPlaying={isPlaying}
+            onTogglePlay={togglePlay}
+            onReset={reset}
+            speed={speed}
+            setSpeed={setSpeed}
+            generation={generation}
+            fitness={fitness}
+          />
+        </div>
+      )}
     </div>
-  )
+  );
 }
+
+const styles = {
+  container: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    padding: '40px 20px',
+    gap: '30px',
+    maxWidth: '800px',
+    margin: '0 auto',
+  },
+  title: {
+    fontSize: '2rem',
+    color: '#333',
+    margin: 0,
+  },
+  loading: {
+    fontSize: '1.2rem',
+    color: '#666',
+  },
+  content: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    gap: '30px',
+    width: '100%',
+  },
+  imagesContainer: {
+    display: 'flex',
+    gap: '20px',
+    justifyContent: 'center',
+    flexWrap: 'wrap' as const,
+  },
+  imageWrapper: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    gap: '10px',
+    backgroundColor: '#fff',
+    padding: '15px',
+    borderRadius: '12px',
+    boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+  },
+  imageLabel: {
+    fontWeight: 'bold',
+    color: '#555',
+  },
+  pixelImage: {
+    width: '100%',
+    height: 'auto',
+    imageRendering: 'pixelated' as const,
+    display: 'block',
+  },
+};
+
+export default App;
