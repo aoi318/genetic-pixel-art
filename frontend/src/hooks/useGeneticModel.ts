@@ -1,7 +1,7 @@
 // src/hooks/useGeneticModel.ts
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import init, { GeneticModel } from 'core-logic';
+import init, { GeneticModel } from 'crate';
 import { loadTargetImage } from '../utils/imageLoader';
 
 const IMAGE_SIZE = 32;
