@@ -2,9 +2,12 @@
 import { useGeneticModel } from './hooks/useGeneticModel';
 import { MosaicCanvas } from './components/MosaicCanvas';
 import { ControlPanel } from './components/ControlPanel';
+import { useState } from 'react';
 
 
 function App() {
+  const [gridSize, setGridSize] = useState<number>(32);
+
   const {
     generation,
     fitness,
@@ -21,7 +24,11 @@ function App() {
     setIsAutoMutation,
     togglePlay,
     reset,
-  } = useGeneticModel();
+  } = useGeneticModel(gridSize);
+
+  const handleSizeChange = (newSize: number) => {
+    setGridSize(newSize);
+  }
 
   return (
     <div style={styles.container}>
@@ -45,8 +52,8 @@ function App() {
               <div style={styles.imageLabel}>Evolution</div>
               <MosaicCanvas
                 imageData={bestImage}
-                width={32}
-                height={32}
+                width={gridSize}
+                height={gridSize}
               />
             </div>
           </div>
@@ -65,6 +72,8 @@ function App() {
             setMutationRate={setMutationRate}
             isAutoMutation={isAutoMutation}
             setIsAutoMutation={setIsAutoMutation}
+            gridSize={gridSize}
+            setGridSize={handleSizeChange}
           />
         </div>
       )}

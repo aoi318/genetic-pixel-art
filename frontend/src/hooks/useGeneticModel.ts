@@ -4,9 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import init, { GeneticModel } from 'crate';
 import { loadTargetImage } from '../utils/imageLoader';
 
-const IMAGE_SIZE = 32;
-
-export const useGeneticModel = () => {
+export const useGeneticModel = (gridsize: number) => {
   const [generation, setGeneration] = useState(0);
   const [fitness, setFitness] = useState(0);
   const [bestImage, setBestImage] = useState<Uint8Array | null>(null);
@@ -60,9 +58,9 @@ export const useGeneticModel = () => {
       try {
         await init();
         const targetUrl = `${import.meta.env.BASE_URL}target.png`;
-        const targetData = await loadTargetImage(targetUrl, IMAGE_SIZE, IMAGE_SIZE);
+        const targetData = await loadTargetImage(targetUrl, gridsize, gridsize);
 
-        modelRef.current = GeneticModel.new(targetData, populationSize);
+        modelRef.current = GeneticModel.new(targetData, populationSize, gridsize);
 
         setIsLoaded(true);
         updateState();
@@ -74,7 +72,7 @@ export const useGeneticModel = () => {
     setup();
 
     return () => stopLoop();
-  }, [populationSize, stopLoop, updateState]);
+  }, [populationSize, gridsize, stopLoop, updateState]);
 
   useEffect(() => {
     if (isPlaying) {
@@ -94,9 +92,9 @@ export const useGeneticModel = () => {
     setIsPlaying(false);
 
     const targetUrl = `${import.meta.env.BASE_URL}target.png`;
-    const targetData = await loadTargetImage(targetUrl, IMAGE_SIZE, IMAGE_SIZE);
+    const targetData = await loadTargetImage(targetUrl, gridsize, gridsize);
 
-    modelRef.current = GeneticModel.new(targetData, populationSize);
+    modelRef.current = GeneticModel.new(targetData, populationSize, gridsize);
 
     setGeneration(0);
     setFitness(0);

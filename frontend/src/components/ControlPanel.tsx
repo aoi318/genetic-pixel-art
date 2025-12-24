@@ -15,6 +15,8 @@ type Props = {
     setMutationRate: (rate: number) => void;
     isAutoMutation: boolean;
     setIsAutoMutation: (isAuto: boolean) => void;
+    gridSize: number;
+    setGridSize: (size: number) => void;
 };
 
 export const ControlPanel: React.FC<Props> = ({
@@ -31,6 +33,8 @@ export const ControlPanel: React.FC<Props> = ({
     setMutationRate,
     isAutoMutation,
     setIsAutoMutation,
+    gridSize,
+    setGridSize,
 }) => {
     return (
         <div style={styles.panel}>
@@ -108,7 +112,31 @@ export const ControlPanel: React.FC<Props> = ({
                     style={{ ...styles.slider, opacity: isAutoMutation ? 0.5 : 1 }}
                 />
             </div>
-        </div>
+
+            {/* グリッドサイズ設定 */}
+            <div>
+                <div className="setting-item">
+                    <label>Grid Size:</label>
+                    <select
+                        value={gridSize}
+                        onChange={(e) => setGridSize(Number(e.target.value))}
+                        disabled={isPlaying}
+                        style={{ padding: '4px', marginLeft: '8px' }}
+                    >
+                        <option value="32">32 x 32</option>
+                        <option value="64">64 x 64</option>
+                        <option value="128">128 x 128</option>
+                    </select>
+                </div>
+
+                {/* 警告メッセージ (条件付きレンダリング) */}
+                {gridSize >= 128 && (
+                    <p style={{ color: 'orange', fontSize: '0.9em', marginTop: '4px' }}>
+                        ⚠ High resolution mode may slow down performance.
+                    </p>
+                )}
+            </div>
+        </div >
     );
 };
 
@@ -180,7 +208,13 @@ const styles = {
         width: '100%',
         cursor: 'pointer',
     },
-    // 追加スタイル
+    select: {
+        width: '100%',
+        padding: '8px',
+        borderRadius: '4px',
+        border: '1px solid #ccc',
+        fontSize: '1rem',
+    },
     divider: {
         border: 'none',
         borderTop: '1px solid #eee',

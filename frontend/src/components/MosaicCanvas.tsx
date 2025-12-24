@@ -21,14 +21,24 @@ export const MosaicCanvas: React.FC<Props> = ({
         const canvas = canvasRef.current;
         if (!canvas || !imageData) return;
 
+        const expectedLength = width * height * 4;
+        if (imageData.length !== expectedLength) {
+            return;
+        }
+
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        const imgData = new ImageData(
-            new Uint8ClampedArray(imageData),
-            32, 32
-        );
-        ctx.putImageData(imgData, 0, 0);
+        try {
+            const imgData = new ImageData(
+                new Uint8ClampedArray(imageData),
+                width,
+                height
+            );
+            ctx.putImageData(imgData, 0, 0);
+        } catch (e) {
+            console.error("Failed to create ImageData:", e);
+        }
 
     }, [imageData, width, height]);
 
