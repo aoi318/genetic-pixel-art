@@ -2,8 +2,6 @@
 
 mod ga;
 
-use std::io::Cursor;
-
 use ga::Population;
 use wasm_bindgen::prelude::*;
 

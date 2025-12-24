@@ -1,8 +1,6 @@
 // crate/src/ga.rs
 
-use image::{imageops::FilterType, ImageBuffer, RgbaImage};
 use rand::Rng;
-use std::io::Cursor;
 
 pub struct Population {
     pub individuals: Vec<Individual>,
@@ -125,23 +123,6 @@ impl Individual {
             fitness: 0.0,
         }
     }
-
-    pub fn get_image_data(&self) -> Vec<u8> {
-        let width: u32 = 32;
-        let height: u32 = 32;
-        let mut buffer: Vec<u8> = Vec::new();
-
-        if let Some(img) = RgbaImage::from_raw(width, height, self.dna.clone()) {
-            let scaled_img: ImageBuffer<image::Rgba<u8>, Vec<u8>> =
-                image::imageops::resize(&img, 320, 320, FilterType::Nearest);
-
-            let mut cursor: Cursor<&mut Vec<u8>> = Cursor::new(&mut buffer);
-            scaled_img
-                .write_to(&mut cursor, image::ImageFormat::Png)
-                .expect("Failed to write image buffer");
-        }
-        buffer
-    }
 }
 
 #[cfg(test)]
@@ -239,16 +220,6 @@ mod tests {
         assert!(has_zero, "Child should inherit some DNA from parent A (0)");
         assert!(has_255, "Child should inherit some DNA from parent B (255)");
         assert_eq!(child.dna.len(), 4096, "Child DNA size should be correct");
-    }
-
-    #[test]
-    fn test_get_image_data() {
-        let ind = Individual::new();
-        let image_data: Vec<u8> = ind.get_image_data();
-
-        assert!(!image_data.is_empty());
-        assert_eq!(image_data[0], 0x89);
-        assert_eq!(image_data[1], 0x50);
     }
 
     #[test]
