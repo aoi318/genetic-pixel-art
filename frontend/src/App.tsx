@@ -13,6 +13,12 @@ function App() {
     isLoaded,
     speed,
     setSpeed,
+    populationSize,
+    setPopulationSize,
+    mutationRate,
+    setMutationRate,
+    isAutoMutation,
+    setIsAutoMutation,
     togglePlay,
     reset,
   } = useGeneticModel();
@@ -53,6 +59,12 @@ function App() {
             setSpeed={setSpeed}
             generation={generation}
             fitness={fitness}
+            populationSize={populationSize}
+            setPopulationSize={setPopulationSize}
+            mutationRate={mutationRate}
+            setMutationRate={setMutationRate}
+            isAutoMutation={isAutoMutation}
+            setIsAutoMutation={setIsAutoMutation}
           />
         </div>
       )}

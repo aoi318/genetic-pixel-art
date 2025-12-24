@@ -14,6 +14,9 @@ export const useGeneticModel = () => {
   const [isLoaded, setIsLoaded] = useState(false);
 
   const [speed, setSpeed] = useState(1);
+  const [populationSize, setPopulationSize] = useState(100);
+  const [mutationRate, setMutationRate] = useState(0.05);
+  const [isAutoMutation, setIsAutoMutation] = useState(true);
 
   const modelRef = useRef<GeneticModel | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -39,14 +42,14 @@ export const useGeneticModel = () => {
       if (!modelRef.current) return;
 
       for (let i = 0; i < speed; i++) {
-        modelRef.current.step();
+        modelRef.current.step(mutationRate, isAutoMutation);
       }
 
       updateState();
 
       animationRef.current = requestAnimationFrame(() => loopRef.current());
     };
-  }, [speed, updateState]);
+  }, [speed, mutationRate, isAutoMutation, updateState]);
 
   const loop = useCallback(() => {
     loopRef.current();
@@ -59,7 +62,7 @@ export const useGeneticModel = () => {
         const targetUrl = `${import.meta.env.BASE_URL}target.png`;
         const targetData = await loadTargetImage(targetUrl, IMAGE_SIZE, IMAGE_SIZE);
 
-        modelRef.current = GeneticModel.new(targetData, 100);
+        modelRef.current = GeneticModel.new(targetData, populationSize);
 
         setIsLoaded(true);
         updateState();
@@ -71,7 +74,7 @@ export const useGeneticModel = () => {
     setup();
 
     return () => stopLoop();
-  }, [stopLoop, updateState]);
+  }, [populationSize, stopLoop, updateState]);
 
   useEffect(() => {
     if (isPlaying) {
@@ -93,7 +96,7 @@ export const useGeneticModel = () => {
     const targetUrl = `${import.meta.env.BASE_URL}target.png`;
     const targetData = await loadTargetImage(targetUrl, IMAGE_SIZE, IMAGE_SIZE);
 
-    modelRef.current = GeneticModel.new(targetData, 100);
+    modelRef.current = GeneticModel.new(targetData, populationSize);
 
     setGeneration(0);
     setFitness(0);
@@ -108,6 +111,12 @@ export const useGeneticModel = () => {
     isLoaded,
     speed,
     setSpeed,
+    populationSize,
+    setPopulationSize,
+    mutationRate,
+    setMutationRate,
+    isAutoMutation,
+    setIsAutoMutation,
     togglePlay,
     reset,
   };

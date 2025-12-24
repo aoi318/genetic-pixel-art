@@ -9,6 +9,12 @@ type Props = {
     setSpeed: (speed: number) => void;
     generation: number;
     fitness: number;
+    populationSize: number;
+    setPopulationSize: (size: number) => void;
+    mutationRate: number;
+    setMutationRate: (rate: number) => void;
+    isAutoMutation: boolean;
+    setIsAutoMutation: (isAuto: boolean) => void;
 };
 
 export const ControlPanel: React.FC<Props> = ({
@@ -19,6 +25,12 @@ export const ControlPanel: React.FC<Props> = ({
     setSpeed,
     generation,
     fitness,
+    populationSize,
+    setPopulationSize,
+    mutationRate,
+    setMutationRate,
+    isAutoMutation,
+    setIsAutoMutation,
 }) => {
     return (
         <div style={styles.panel}>
@@ -42,6 +54,7 @@ export const ControlPanel: React.FC<Props> = ({
                 </button>
             </div>
 
+            {/* 速度スライダー */}
             <div style={styles.sliderGroup}>
                 <label style={styles.label}>Speed: x{speed}</label>
                 <input
@@ -51,6 +64,48 @@ export const ControlPanel: React.FC<Props> = ({
                     value={speed}
                     onChange={(e) => setSpeed(Number(e.target.value))}
                     style={styles.slider}
+                />
+            </div>
+
+            <hr style={styles.divider} />
+
+            {/* 人口サイズ（リセットで適用） */}
+            <div style={styles.sliderGroup}>
+                <label style={styles.label}>Population: {populationSize} (Reset to apply)</label>
+                <input
+                    type="range"
+                    min="10"
+                    max="1000"
+                    step="10"
+                    value={populationSize}
+                    onChange={(e) => setPopulationSize(Number(e.target.value))}
+                    style={styles.slider}
+                />
+            </div>
+
+            {/* 変異率設定 */}
+            <div style={styles.sliderGroup}>
+                <div style={styles.row}>
+                    <label style={styles.label}>Mutation Rate: {mutationRate.toFixed(3)}</label>
+                    <label style={styles.checkboxLabel}>
+                        <input
+                            type="checkbox"
+                            checked={isAutoMutation}
+                            onChange={(e) => setIsAutoMutation(e.target.checked)}
+                        />
+                        Auto
+                    </label>
+                </div>
+
+                <input
+                    type="range"
+                    min="0.001"
+                    max="0.1"
+                    step="0.001"
+                    value={mutationRate}
+                    disabled={isAutoMutation}
+                    onChange={(e) => setMutationRate(Number(e.target.value))}
+                    style={{ ...styles.slider, opacity: isAutoMutation ? 0.5 : 1 }}
                 />
             </div>
         </div>
@@ -123,6 +178,26 @@ const styles = {
     },
     slider: {
         width: '100%',
+        cursor: 'pointer',
+    },
+    // 追加スタイル
+    divider: {
+        border: 'none',
+        borderTop: '1px solid #eee',
+        width: '100%',
+        margin: '0',
+    },
+    row: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    checkboxLabel: {
+        fontSize: '0.8rem',
+        color: '#333',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
         cursor: 'pointer',
     },
 };
