@@ -19,12 +19,12 @@ pub struct GeneticModel {
 
 #[wasm_bindgen]
 impl GeneticModel {
-    pub fn new(target_image_data: &[u8], population_size: usize) -> Self {
+    pub fn new(target_image_data: &[u8], population_size: usize, length: usize) -> Self {
         console_error_panic_hook::set_once();
         let target_vec: Vec<u8> = target_image_data.to_vec();
 
         Self {
-            population: Population::new(population_size),
+            population: Population::new(population_size, length),
             target: target_vec,
         }
     }

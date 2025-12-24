@@ -8,11 +8,11 @@ pub struct Population {
 }
 
 impl Population {
-    pub fn new(size: usize) -> Self {
+    pub fn new(size: usize, length: usize) -> Self {
         let mut individuals: Vec<Individual> = Vec::with_capacity(size);
 
         for _ in 0..size {
-            individuals.push(Individual::new());
+            individuals.push(Individual::new(length));
         }
 
         Self {
@@ -68,16 +68,21 @@ impl Population {
 pub struct Individual {
     pub dna: Vec<u8>,
     fitness: f64,
+    length: usize,
 }
 
 impl Individual {
-    fn new() -> Self {
-        let size: usize = 32 * 32 * 4;
+    fn new(length: usize) -> Self {
+        let size: usize = length * length * 4;
 
         let mut rng = rand::rng();
         let dna: Vec<u8> = (0..size).map(|_| rng.random_range(0..=255)).collect();
 
-        Self { dna, fitness: 0.0 }
+        Self {
+            dna,
+            fitness: 0.0,
+            length,
+        }
     }
 
     fn calculate_fitness(&mut self, target: &[u8]) {
@@ -121,6 +126,7 @@ impl Individual {
         Individual {
             dna: new_dna,
             fitness: 0.0,
+            length: self.length,
         }
     }
 }
@@ -131,13 +137,13 @@ mod tests {
 
     #[test]
     fn test_individual_size() {
-        let ind: Individual = Individual::new();
+        let ind: Individual = Individual::new(32);
         assert_eq!(ind.dna.len(), 4096);
     }
 
     #[test]
     fn test_fitness_perfect_match() {
-        let mut ind: Individual = Individual::new();
+        let mut ind: Individual = Individual::new(32);
         let target: Vec<u8> = vec![0; 4096];
         ind.dna = vec![0u8; 4096];
 
@@ -148,7 +154,7 @@ mod tests {
 
     #[test]
     fn test_mutation_changes_dna() {
-        let mut ind: Individual = Individual::new();
+        let mut ind: Individual = Individual::new(32);
         ind.mutate(1.0);
 
         let is_changed: bool = ind.dna.iter().any(|&x| x != 0);
@@ -158,15 +164,16 @@ mod tests {
     #[test]
     fn test_population_new() {
         let size: usize = 10;
-        let pop: Population = Population::new(size);
+        let length: usize = 32;
+        let pop: Population = Population::new(size, length);
 
         assert_eq!(pop.individuals.len(), size);
     }
 
     #[test]
     fn test_compute_fitnesses() {
-        let mut pop: Population = Population::new(10);
-        let target: Vec<u8> = vec![0u8; 32 * 32 * 4];
+        let mut pop: Population = Population::new(10, 32);
+        let target: Vec<u8> = vec![0u8; 4096];
 
         assert_eq!(pop.individuals[0].fitness, 0.0);
 
@@ -177,7 +184,7 @@ mod tests {
 
     #[test]
     fn test_sort() {
-        let mut pop: Population = Population::new(3);
+        let mut pop: Population = Population::new(3, 32);
         pop.individuals[0].fitness = 0.1;
         pop.individuals[1].fitness = 0.9;
         pop.individuals[2].fitness = 0.5;
@@ -190,8 +197,8 @@ mod tests {
     #[test]
     fn test_evolve() {
         let size: usize = 10;
-        let target: Vec<u8> = vec![0u8; 32 * 32 * 4];
-        let mut pop: Population = Population::new(size);
+        let target: Vec<u8> = vec![0u8; 4096];
+        let mut pop: Population = Population::new(size, 32);
 
         pop.compute_fitnesses(&target);
         pop.sort_by_fitness();
@@ -206,10 +213,10 @@ mod tests {
 
     #[test]
     fn test_crossover() {
-        let mut parent_a: Individual = Individual::new();
+        let mut parent_a: Individual = Individual::new(32);
         parent_a.dna = vec![0u8; 4096];
 
-        let mut parent_b: Individual = Individual::new();
+        let mut parent_b: Individual = Individual::new(32);
         parent_b.dna = vec![255u8; 4096];
 
         let child: Individual = parent_a.crossover(&parent_b);
@@ -225,8 +232,8 @@ mod tests {
     #[test]
     fn test_elitism() {
         let size: usize = 10;
-        let mut pop: Population = Population::new(size);
-        let target: Vec<u8> = vec![100u8; 32 * 32 * 4];
+        let mut pop: Population = Population::new(size, 32);
+        let target: Vec<u8> = vec![100u8; 4096];
 
         pop.compute_fitnesses(&target);
         pop.sort_by_fitness();
@@ -239,5 +246,14 @@ mod tests {
             pop.individuals[0].fitness >= best_fitness_gen0,
             "Best fitness decreased! Elitism might be broken."
         );
+    }
+
+    #[test]
+    fn test_individual_dynamic_size() {
+        let length: usize = 64;
+        let ind: Individual = Individual::new(length);
+
+        assert_eq!(ind.dna.len(), 64 * 64 * 4);
+        assert_eq!(ind.length, 64);
     }
 }
