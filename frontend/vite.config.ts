@@ -10,6 +10,9 @@ export default defineConfig({
     react(),
     topLevelAwait()
   ],
+  worker: {
+    format: 'es',
+  },
   server: {
     fs: {
       allow: [
