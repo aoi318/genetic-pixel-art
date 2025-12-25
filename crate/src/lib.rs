@@ -29,12 +29,13 @@ impl GeneticModel {
         }
     }
 
-    pub fn step(&mut self, base_mutation_rate: f64, is_auto: bool) {
+    pub fn step(&mut self, base_mutation_rate: f64, is_auto: bool, is_palallel: bool) {
         let current_fitness: f64 = self.population.best_fitness();
         let effective_rate: f64 =
             calculate_effective_mutation_rate(current_fitness, base_mutation_rate, is_auto);
 
-        self.population.evolve(&self.target, effective_rate);
+        self.population
+            .evolve(&self.target, effective_rate, is_palallel);
     }
 
     pub fn get_best_image(&self) -> Vec<u8> {

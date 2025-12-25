@@ -1,6 +1,7 @@
 // crate/src/ga.rs
 
 use rand::Rng;
+use rayon::prelude::*;
 
 pub struct Population {
     pub individuals: Vec<Individual>,
@@ -21,23 +22,38 @@ impl Population {
         }
     }
 
-    fn compute_fitnesses(&mut self, target: &[u8]) {
-        for ind in self.individuals.iter_mut() {
-            ind.calculate_fitness(target);
+    fn compute_fitnesses(&mut self, target: &[u8], is_parallel: bool) {
+        if is_parallel {
+            self.individuals
+                .par_iter_mut()
+                .for_each(|ind: &mut Individual| ind.calculate_fitness(target));
+        } else {
+            for ind in self.individuals.iter_mut() {
+                ind.calculate_fitness(target);
+            }
         }
     }
 
-    fn sort_by_fitness(&mut self) {
-        self.individuals.sort_by(|a: &Individual, b: &Individual| {
-            b.fitness
-                .partial_cmp(&a.fitness)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+    fn sort_by_fitness(&mut self, is_parallel: bool) {
+        if is_parallel {
+            self.individuals
+                .par_sort_by(|a: &Individual, b: &Individual| {
+                    b.fitness
+                        .partial_cmp(&a.fitness)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
+        } else {
+            self.individuals.sort_by(|a: &Individual, b: &Individual| {
+                b.fitness
+                    .partial_cmp(&a.fitness)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+        }
     }
 
-    pub fn evolve(&mut self, target: &[u8], mutation_rate: f64) {
-        self.compute_fitnesses(target);
-        self.sort_by_fitness();
+    pub fn evolve(&mut self, target: &[u8], mutation_rate: f64, is_parallel: bool) {
+        self.compute_fitnesses(target, is_parallel);
+        self.sort_by_fitness(is_parallel);
 
         let mut next_generation: Vec<Individual> = Vec::with_capacity(self.individuals.len());
         let mut rng: rand::prelude::ThreadRng = rand::rng();
@@ -45,14 +61,32 @@ impl Population {
 
         next_generation.push(self.individuals[0].clone());
 
-        while next_generation.len() < self.individuals.len() {
-            let parent1: &Individual = &self.individuals[rng.random_range(0..elite_count)];
-            let parent2: &Individual = &self.individuals[rng.random_range(0..elite_count)];
+        if is_parallel {
+            let num_children: usize = self.individuals.len() - 1;
+            let children: Vec<Individual> = (0..num_children)
+                .into_par_iter()
+                .map(|_| {
+                    let mut rng: rand::prelude::ThreadRng = rand::rng();
+                    let parent1: &Individual = &self.individuals[rng.random_range(0..elite_count)];
+                    let parent2: &Individual = &self.individuals[rng.random_range(0..elite_count)];
 
-            let mut child: Individual = parent1.crossover(parent2);
+                    let mut child: Individual = parent1.crossover(parent2);
+                    child.mutate(mutation_rate);
+                    child
+                })
+                .collect();
 
-            child.mutate(mutation_rate);
-            next_generation.push(child);
+            next_generation.extend(children);
+        } else {
+            while next_generation.len() < self.individuals.len() {
+                let parent1: &Individual = &self.individuals[rng.random_range(0..elite_count)];
+                let parent2: &Individual = &self.individuals[rng.random_range(0..elite_count)];
+
+                let mut child: Individual = parent1.crossover(parent2);
+
+                child.mutate(mutation_rate);
+                next_generation.push(child);
+            }
         }
 
         self.individuals = next_generation;
@@ -177,7 +211,7 @@ mod tests {
 
         assert_eq!(pop.individuals[0].fitness, 0.0);
 
-        pop.compute_fitnesses(&target);
+        pop.compute_fitnesses(&target, false);
 
         assert!(0.0 < pop.individuals[0].fitness);
     }
@@ -189,7 +223,7 @@ mod tests {
         pop.individuals[1].fitness = 0.9;
         pop.individuals[2].fitness = 0.5;
 
-        pop.sort_by_fitness();
+        pop.sort_by_fitness(false);
 
         assert_eq!(pop.individuals[0].fitness, 0.9);
     }
@@ -200,11 +234,11 @@ mod tests {
         let target: Vec<u8> = vec![0u8; 4096];
         let mut pop: Population = Population::new(size, 32);
 
-        pop.compute_fitnesses(&target);
-        pop.sort_by_fitness();
+        pop.compute_fitnesses(&target, false);
+        pop.sort_by_fitness(false);
         let prevscore: f64 = pop.individuals[0].fitness;
 
-        pop.evolve(&target, 0.1);
+        pop.evolve(&target, 0.1, false);
 
         assert_eq!(pop.generation, 1);
         assert_eq!(pop.individuals.len(), size);
@@ -235,12 +269,12 @@ mod tests {
         let mut pop: Population = Population::new(size, 32);
         let target: Vec<u8> = vec![100u8; 4096];
 
-        pop.compute_fitnesses(&target);
-        pop.sort_by_fitness();
+        pop.compute_fitnesses(&target, false);
+        pop.sort_by_fitness(false);
 
         let best_fitness_gen0: f64 = pop.individuals[0].fitness;
 
-        pop.evolve(&target, 0.1);
+        pop.evolve(&target, 0.1, false);
 
         assert!(
             pop.individuals[0].fitness >= best_fitness_gen0,
@@ -255,5 +289,16 @@ mod tests {
 
         assert_eq!(ind.dna.len(), 64 * 64 * 4);
         assert_eq!(ind.length, 64);
+    }
+
+    #[test]
+    fn test_parallel_execution() {
+        let size: usize = 100;
+        let target: Vec<u8> = vec![0u8; 4096];
+        let mut pop: Population = Population::new(size, 32);
+
+        pop.compute_fitnesses(&target, true);
+
+        assert!(pop.individuals[0].fitness > 0.0);
     }
 }

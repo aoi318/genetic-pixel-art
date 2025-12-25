@@ -226,6 +226,7 @@ dependencies = [
  "getrandom",
  "image",
  "rand",
+ "rayon",
  "wasm-bindgen",
  "wasm-bindgen-test",
  "web-sys",
