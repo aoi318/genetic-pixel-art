@@ -17,6 +17,9 @@ type Props = {
     setIsAutoMutation: (isAuto: boolean) => void;
     gridSize: number;
     setGridSize: (size: number) => void;
+    isParallel: boolean;
+    setIsParallel: (isParallel: boolean) => void;
+    fps: number;
 };
 
 export const ControlPanel: React.FC<Props> = ({
@@ -35,6 +38,9 @@ export const ControlPanel: React.FC<Props> = ({
     setIsAutoMutation,
     gridSize,
     setGridSize,
+    isParallel,
+    setIsParallel,
+    fps,
 }) => {
     return (
         <div style={styles.panel}>
@@ -48,7 +54,10 @@ export const ControlPanel: React.FC<Props> = ({
                     <span style={styles.value}>{(fitness * 100).toFixed(2)}%</span>
                 </div>
             </div>
-
+            <div style={styles.statItem}>
+                <span style={styles.label}>Speed:</span>
+                <span style={styles.value}>{fps} FPS</span>
+            </div>
             <div style={styles.controlsGroup}>
                 <button onClick={onTogglePlay} style={styles.button}>
                     {isPlaying ? '⏸ Pause' : '▶ Play'}
@@ -56,6 +65,18 @@ export const ControlPanel: React.FC<Props> = ({
                 <button onClick={onReset} style={styles.buttonSecondary}>
                     ↺ Reset
                 </button>
+            </div>
+
+            {/* 並列処理設定 */}
+            <div style={styles.sliderGroup}>
+                <label style={styles.checkboxLabel}>
+                    <input
+                        type="checkbox"
+                        checked={isParallel}
+                        onChange={(e) => setIsParallel(e.target.checked)}
+                    />
+                    Enable Parallel Processing (WASM)
+                </label>
             </div>
 
             {/* 速度スライダー */}
@@ -213,7 +234,6 @@ const styles = {
         padding: '8px',
         borderRadius: '4px',
         border: '1px solid #ccc',
-        fontSize: '1rem',
     },
     divider: {
         border: 'none',

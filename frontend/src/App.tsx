@@ -24,6 +24,9 @@ function App() {
     setIsAutoMutation,
     togglePlay,
     reset,
+    isParallel,
+    setIsParallel,
+    fps,
   } = useGeneticModel(gridSize);
 
   const handleSizeChange = (newSize: number) => {
@@ -74,6 +77,9 @@ function App() {
             setIsAutoMutation={setIsAutoMutation}
             gridSize={gridSize}
             setGridSize={handleSizeChange}
+            isParallel={isParallel}
+            setIsParallel={setIsParallel}
+            fps={fps}
           />
         </div>
       )}

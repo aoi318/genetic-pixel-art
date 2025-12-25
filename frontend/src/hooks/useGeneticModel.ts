@@ -10,11 +10,14 @@ export const useGeneticModel = (gridsize: number) => {
   const [bestImage, setBestImage] = useState<Uint8Array | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
-
   const [speed, setSpeed] = useState(1);
   const [populationSize, setPopulationSize] = useState(100);
   const [mutationRate, setMutationRate] = useState(0.05);
   const [isAutoMutation, setIsAutoMutation] = useState(true);
+  const [isParallel, setIsParallel] = useState(false);
+  const [fps, setFps] = useState(0);
+  const lastFpsUpdateTimeRef = useRef<number>(0);
+  const frameCountRef = useRef<number>(0);
 
   const modelRef = useRef<GeneticModel | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -40,16 +43,31 @@ export const useGeneticModel = (gridsize: number) => {
       if (!modelRef.current) return;
 
       for (let i = 0; i < speed; i++) {
-        modelRef.current.step(mutationRate, isAutoMutation);
+        modelRef.current.step(mutationRate, isAutoMutation, isParallel);
+      }
+
+      const now = performance.now();
+      frameCountRef.current++;
+
+      if (now - lastFpsUpdateTimeRef.current >= 100) {
+        const elapsed = now - lastFpsUpdateTimeRef.current;
+        const currentFps = Math.round((frameCountRef.current * 1000) / elapsed);
+
+        setFps(currentFps);
+
+        frameCountRef.current = 0;
+        lastFpsUpdateTimeRef.current = now;
       }
 
       updateState();
 
       animationRef.current = requestAnimationFrame(() => loopRef.current());
     };
-  }, [speed, mutationRate, isAutoMutation, updateState]);
+  }, [speed, mutationRate, isAutoMutation, isParallel, updateState]);
 
   const loop = useCallback(() => {
+    lastFpsUpdateTimeRef.current = performance.now();
+    frameCountRef.current = 0;
     loopRef.current();
   }, []);
 
@@ -90,6 +108,7 @@ export const useGeneticModel = (gridsize: number) => {
   const reset = async () => {
     stopLoop();
     setIsPlaying(false);
+    setFps(0);
 
     const targetUrl = `${import.meta.env.BASE_URL}target.png`;
     const targetData = await loadTargetImage(targetUrl, gridsize, gridsize);
@@ -115,6 +134,9 @@ export const useGeneticModel = (gridsize: number) => {
     setMutationRate,
     isAutoMutation,
     setIsAutoMutation,
+    isParallel,
+    setIsParallel,
+    fps,
     togglePlay,
     reset,
   };
