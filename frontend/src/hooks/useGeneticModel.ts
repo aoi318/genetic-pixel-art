@@ -1,7 +1,7 @@
 // src/hooks/useGeneticModel.ts
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import init, { GeneticModel } from 'crate';
+import init, { GeneticModel, initThreadPool } from 'crate';
 import { loadTargetImage } from '../utils/imageLoader';
 
 export const useGeneticModel = (gridsize: number) => {
@@ -74,7 +74,21 @@ export const useGeneticModel = (gridsize: number) => {
   useEffect(() => {
     const setup = async () => {
       try {
-        await init();
+        // SharedArrayBuffer がサポートされているか確認
+        if (typeof SharedArrayBuffer === 'undefined') {
+          throw new Error('SharedArrayBuffer がサポートされていません。CORS ヘッダーを確認してください。');
+        }
+
+        console.log('WASM を初期化中...');
+        await init(`${import.meta.env.BASE_URL}crate_bg.wasm`);
+
+        // スレッド数を制限（多すぎるとエラーになる場合がある）
+        const numThreads = Math.min(navigator.hardwareConcurrency || 4, 4);
+        console.log(`${numThreads} スレッドを初期化中...`);
+
+        await initThreadPool(numThreads);
+        console.log('スレッドプール初期化完了');
+
         const targetUrl = `${import.meta.env.BASE_URL}target.png`;
         const targetData = await loadTargetImage(targetUrl, gridsize, gridsize);
 
@@ -84,6 +98,11 @@ export const useGeneticModel = (gridsize: number) => {
         updateState();
       } catch (e) {
         console.error("Setup failed:", e);
+        console.error("Error details:", {
+          message: e.message,
+          stack: e.stack,
+          name: e.name
+        });
       }
     };
 
