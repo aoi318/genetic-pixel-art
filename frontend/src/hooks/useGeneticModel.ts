@@ -1,10 +1,9 @@
 // src/hooks/useGeneticModel.ts
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import init, { GeneticModel, initThreadPool } from 'crate'; //
-import { loadTargetImage } from '../utils/imageLoader'; //
+import init, { GeneticModel, initThreadPool } from 'crate';
+import { loadTargetImage } from '../utils/imageLoader';
 
-// 初期化の状態を管理するグローバル変数
 let initPromise: Promise<void> | null = null;
 
 export const useGeneticModel = (gridsize: number) => {
@@ -52,6 +51,15 @@ export const useGeneticModel = (gridsize: number) => {
       const now = performance.now();
       frameCountRef.current++;
 
+      if (frameCountRef.current % 10 === 0) {
+        updateState();
+      }
+
+      if (frameCountRef.current % 100 === 0) {
+        performance.clearMarks();
+        performance.clearMeasures();
+      }
+
       if (now - lastFpsUpdateTimeRef.current >= 100) {
         const elapsed = now - lastFpsUpdateTimeRef.current;
         const currentFps = Math.round((frameCountRef.current * 1000) / elapsed);
@@ -60,7 +68,6 @@ export const useGeneticModel = (gridsize: number) => {
         lastFpsUpdateTimeRef.current = now;
       }
 
-      updateState();
       animationRef.current = requestAnimationFrame(() => loopRef.current());
     };
   }, [speed, mutationRate, isAutoMutation, isParallel, updateState]);
@@ -71,11 +78,9 @@ export const useGeneticModel = (gridsize: number) => {
     loopRef.current();
   }, []);
 
-  // 初期化ロジックの修正
   useEffect(() => {
     const setup = async () => {
       try {
-        // まだ初期化が始まっていない場合のみ実行
         if (!initPromise) {
           initPromise = (async () => {
             if (typeof SharedArrayBuffer === 'undefined') {
@@ -83,42 +88,37 @@ export const useGeneticModel = (gridsize: number) => {
             }
 
             console.log('WASM を初期化中...');
-            await init(`${import.meta.env.BASE_URL}crate_bg.wasm`);
+            const wasm = await init(`${import.meta.env.BASE_URL}crate_bg.wasm`);
+
+            console.log('Shared Memory?', wasm.memory.buffer instanceof SharedArrayBuffer);
 
             const numThreads = Math.min(navigator.hardwareConcurrency || 4, 4);
             console.log(`${numThreads} スレッドを初期化中...`);
 
-            // initThreadPool は一度だけ呼ぶ
             await initThreadPool(numThreads);
             console.log('スレッドプール初期化完了');
           })();
         }
 
-        // 初期化の完了を待つ（2回目以降の呼び出しでもここは待機するだけで再実行しない）
         await initPromise;
 
-        // モデルの作成は毎回（またはパラメータ変更時に）行う
         const targetUrl = `${import.meta.env.BASE_URL}target.png`;
         const targetData = await loadTargetImage(targetUrl, gridsize, gridsize);
 
-        // 古いモデルがあれば破棄（Rust側のメモリ解放はGCに任せるか、明示的なfreeが必要なら呼ぶ）
         modelRef.current = GeneticModel.new(targetData, populationSize, gridsize);
 
         setIsLoaded(true);
         updateState();
       } catch (e) {
         console.error("Setup failed:", e);
-        // エラー時は再試行できるようにPromiseをクリアするなどの考慮が必要だが、
-        // 重大なエラー（WASMロード失敗など）はリロード推奨
       }
     };
 
     setup();
 
     return () => stopLoop();
-  }, [populationSize, gridsize, stopLoop, updateState]); // 依存配列は維持
+  }, [populationSize, gridsize, stopLoop, updateState]);
 
-  // ... (残りのコードは同じ)
   useEffect(() => {
     if (isPlaying) {
       loop();

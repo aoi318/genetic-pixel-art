@@ -3,6 +3,7 @@
 mod ga;
 
 use ga::Population;
+use rayon::prelude::*; // 並列イテレータ(par_iter_mut)を使うために必要
 use wasm_bindgen::prelude::*;
 pub use wasm_bindgen_rayon::init_thread_pool;
 
@@ -14,7 +15,7 @@ extern "C" {
 
 #[wasm_bindgen]
 pub struct GeneticModel {
-    population: Population,
+    islands: Vec<Population>,
     target: Vec<u8>,
 }
 
@@ -24,31 +25,89 @@ impl GeneticModel {
         console_error_panic_hook::set_once();
         let target_vec: Vec<u8> = target_image_data.to_vec();
 
+        let num_islands: usize = 4;
+        let size_per_island: usize = population_size / num_islands;
+
+        let mut islands: Vec<Population> = Vec::with_capacity(num_islands);
+        for _ in 0..num_islands {
+            islands.push(Population::new(size_per_island, length));
+        }
+
         Self {
-            population: Population::new(population_size, length),
+            islands,
             target: target_vec,
         }
     }
 
-    pub fn step(&mut self, base_mutation_rate: f64, is_auto: bool, is_palallel: bool) {
-        let current_fitness: f64 = self.population.best_fitness();
+    pub fn step(&mut self, base_mutation_rate: f64, is_auto: bool, is_parallel: bool) {
+        let current_fitness: f64 = self.get_best_fitness();
         let effective_rate: f64 =
             calculate_effective_mutation_rate(current_fitness, base_mutation_rate, is_auto);
 
-        self.population
-            .evolve(&self.target, effective_rate, is_palallel);
+        let target: &Vec<u8> = &self.target;
+
+        if is_parallel {
+            self.islands
+                .par_iter_mut()
+                .for_each(|island: &mut Population| {
+                    island.evolve(target, effective_rate, false);
+                });
+        } else {
+            for island in self.islands.iter_mut() {
+                island.evolve(target, effective_rate, false);
+            }
+        }
+
+        if self.get_generation() % 50 == 0 {
+            self.migrate();
+        }
     }
 
     pub fn get_best_image(&self) -> Vec<u8> {
-        self.population.individuals[0].dna.clone()
+        self.get_best_island().individuals[0].dna.clone()
     }
 
     pub fn get_best_fitness(&self) -> f64 {
-        self.population.best_fitness()
+        self.get_best_island().best_fitness()
     }
 
     pub fn get_generation(&self) -> usize {
-        self.population.generation
+        if self.islands.is_empty() {
+            return 0;
+        }
+        self.islands[0].generation
+    }
+
+    fn get_best_island(&self) -> &Population {
+        self.islands
+            .iter()
+            .max_by(|a: &&Population, b: &&Population| {
+                a.best_fitness()
+                    .partial_cmp(&b.best_fitness())
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .expect("No islands found")
+    }
+
+    fn migrate(&mut self) {
+        let num_islands = self.islands.len();
+        if num_islands < 2 {
+            return;
+        }
+
+        let elites: Vec<_> = self
+            .islands
+            .iter()
+            .map(|island: &Population| island.individuals[0].clone())
+            .collect();
+
+        for i in 0..num_islands {
+            let target_idx: usize = (i + 1) % num_islands;
+            let target_island: &mut Population = &mut self.islands[target_idx];
+
+            let worst_idx: usize = target_island.individuals.len() - 1;
+            target_island.individuals[worst_idx] = elites[i].clone();
+        }
     }
 }
 

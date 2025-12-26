@@ -5,6 +5,7 @@ use rayon::prelude::*;
 
 pub struct Population {
     pub individuals: Vec<Individual>,
+    pub buffer: Vec<Individual>,
     pub generation: usize,
 }
 
@@ -16,8 +17,11 @@ impl Population {
             individuals.push(Individual::new(length));
         }
 
+        let buffer: Vec<Individual> = individuals.clone();
+
         Self {
             individuals,
+            buffer,
             generation: 0,
         }
     }
@@ -55,22 +59,25 @@ impl Population {
         self.compute_fitnesses(target, is_parallel);
         self.sort_by_fitness(is_parallel);
 
-        let mut next_generation: Vec<Individual> = Vec::with_capacity(self.individuals.len());
+        let individuals: &Vec<Individual> = &self.individuals;
+        let next_generation: &mut Vec<Individual> = &mut self.buffer;
+        next_generation.clear();
         let mut rng: rand::prelude::ThreadRng = rand::rng();
         let elite_count: usize = self.individuals.len() / 2;
 
         next_generation.push(self.individuals[0].clone());
 
+        let num_children: usize = individuals.len() - 1;
+
         if is_parallel {
-            let num_children: usize = self.individuals.len() - 1;
             let children: Vec<Individual> = (0..num_children)
                 .into_par_iter()
                 .map(|_| {
                     let mut rng: rand::prelude::ThreadRng = rand::rng();
-                    let parent1: &Individual = &self.individuals[rng.random_range(0..elite_count)];
-                    let parent2: &Individual = &self.individuals[rng.random_range(0..elite_count)];
+                    let p1: &Individual = &individuals[rng.random_range(0..elite_count)];
+                    let p2: &Individual = &individuals[rng.random_range(0..elite_count)];
 
-                    let mut child: Individual = parent1.crossover(parent2);
+                    let mut child: Individual = p1.crossover(p2);
                     child.mutate(mutation_rate);
                     child
                 })
@@ -78,18 +85,17 @@ impl Population {
 
             next_generation.extend(children);
         } else {
-            while next_generation.len() < self.individuals.len() {
-                let parent1: &Individual = &self.individuals[rng.random_range(0..elite_count)];
-                let parent2: &Individual = &self.individuals[rng.random_range(0..elite_count)];
+            while next_generation.len() < individuals.len() {
+                let p1: &Individual = &individuals[rng.random_range(0..elite_count)];
+                let p2: &Individual = &individuals[rng.random_range(0..elite_count)];
 
-                let mut child: Individual = parent1.crossover(parent2);
-
+                let mut child: Individual = p1.crossover(p2);
                 child.mutate(mutation_rate);
                 next_generation.push(child);
             }
         }
 
-        self.individuals = next_generation;
+        std::mem::swap(&mut self.individuals, &mut self.buffer);
         self.generation += 1;
     }
 
@@ -109,7 +115,7 @@ impl Individual {
     fn new(length: usize) -> Self {
         let size: usize = length * length * 4;
 
-        let mut rng = rand::rng();
+        let mut rng: rand::prelude::ThreadRng = rand::rng();
         let dna: Vec<u8> = (0..size).map(|_| rng.random_range(0..=255)).collect();
 
         Self {
@@ -135,27 +141,29 @@ impl Individual {
 
     fn mutate(&mut self, mutation_rate: f64) {
         let mut rng: rand::prelude::ThreadRng = rand::rng();
+        let len: usize = self.dna.len();
 
-        for val in self.dna.iter_mut() {
-            if rng.random::<f64>() < mutation_rate {
-                let noise: i16 = rng.random_range(-10..=10);
-                *val = (*val as i16 + noise).clamp(0, 255) as u8;
-            };
+        let num_mutations: usize = (len as f64 * mutation_rate).max(1.0) as usize;
+
+        for _ in 0..num_mutations {
+            let idx: usize = rng.random_range(0..len);
+            let noise: i16 = rng.random_range(-10..=10);
+
+            self.dna[idx] = (self.dna[idx] as i16 + noise).clamp(0, 255) as u8;
         }
     }
 
     pub fn crossover(&self, partner: &Individual) -> Individual {
         let mut rng: rand::prelude::ThreadRng = rand::rng();
-        let size: usize = self.dna.len();
-        let mut new_dna: Vec<u8> = Vec::with_capacity(size);
+        let len: usize = self.dna.len();
 
-        for (g1, g2) in self.dna.iter().zip(partner.dna.iter()) {
-            if rng.random_bool(0.5) {
-                new_dna.push(*g1);
-            } else {
-                new_dna.push(*g2);
-            }
-        }
+        let mut new_dna: Vec<u8> = self.dna.clone();
+
+        let p1: usize = rng.random_range(0..len);
+        let p2: usize = rng.random_range(0..len);
+        let (start, end) = if p1 < p2 { (p1, p2) } else { (p2, p1) };
+
+        new_dna[start..end].copy_from_slice(&partner.dna[start..end]);
 
         Individual {
             dna: new_dna,
