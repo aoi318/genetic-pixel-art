@@ -165,22 +165,23 @@ mod test {
 
     #[test]
     fn test_mutation_rate_auto_on_high_fitness() {
-        let rate = calculate_effective_mutation_rate(0.96, 0.05, true);
-        assert_eq!(rate, 0.015);
+        let rate = calculate_effective_mutation_rate(0.96, 0.1, true);
+        assert!((rate - 0.08).abs() < 1e-10);
     }
 
     #[test]
     fn test_mutation_rate_auto_on_very_high_fitness() {
-        let rate = calculate_effective_mutation_rate(0.99, 0.05, true);
-        assert_eq!(rate, 0.005);
+        let rate = calculate_effective_mutation_rate(0.991, 0.1, true);
+        assert!((rate - 0.03).abs() < 1e-10);
     }
 
     #[test]
     fn test_mutation_rate_gradient() {
         assert_eq!(calculate_effective_mutation_rate(0.5, 0.1, true), 0.1);
-        assert_eq!(calculate_effective_mutation_rate(0.85, 0.1, true), 0.07);
-        assert_eq!(calculate_effective_mutation_rate(0.92, 0.1, true), 0.05);
-        assert_eq!(calculate_effective_mutation_rate(0.96, 0.1, true), 0.03);
-        assert_eq!(calculate_effective_mutation_rate(0.99, 0.1, true), 0.01);
+        assert!((calculate_effective_mutation_rate(0.92, 0.1, true) - 0.09).abs() < 1e-10);
+        assert!((calculate_effective_mutation_rate(0.96, 0.1, true) - 0.08).abs() < 1e-10);
+        assert!((calculate_effective_mutation_rate(0.975, 0.1, true) - 0.07).abs() < 1e-10);
+        assert!((calculate_effective_mutation_rate(0.985, 0.1, true) - 0.05).abs() < 1e-10);
+        assert!((calculate_effective_mutation_rate(0.995, 0.1, true) - 0.03).abs() < 1e-10);
     }
 }
