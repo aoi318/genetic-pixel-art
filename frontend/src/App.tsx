@@ -14,8 +14,8 @@ function App() {
     bestImage,
     isPlaying,
     isLoaded,
-    speed,
-    setSpeed,
+    updateInterval,
+    setUpdateInterval,
     populationSize,
     setPopulationSize,
     mutationRate,
@@ -65,8 +65,8 @@ function App() {
             isPlaying={isPlaying}
             onTogglePlay={togglePlay}
             onReset={reset}
-            speed={speed}
-            setSpeed={setSpeed}
+            updateInterval={updateInterval}
+            setUpdateInterval={setUpdateInterval}
             generation={generation}
             fitness={fitness}
             populationSize={populationSize}

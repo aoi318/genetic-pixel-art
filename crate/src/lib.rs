@@ -3,7 +3,7 @@
 mod ga;
 
 use ga::Population;
-use rayon::prelude::*; // 並列イテレータ(par_iter_mut)を使うために必要
+use rayon::prelude::*;
 use wasm_bindgen::prelude::*;
 pub use wasm_bindgen_rayon::init_thread_pool;
 
@@ -39,6 +39,19 @@ impl GeneticModel {
         }
     }
 
+    // 🔥 新機能: バッチ処理
+    pub fn step_batch(
+        &mut self,
+        batch_size: usize,
+        base_mutation_rate: f64,
+        is_auto: bool,
+        is_parallel: bool,
+    ) {
+        for _ in 0..batch_size {
+            self.step(base_mutation_rate, is_auto, is_parallel);
+        }
+    }
+
     pub fn step(&mut self, base_mutation_rate: f64, is_auto: bool, is_parallel: bool) {
         let current_fitness: f64 = self.get_best_fitness();
         let effective_rate: f64 =
@@ -50,7 +63,8 @@ impl GeneticModel {
             self.islands
                 .par_iter_mut()
                 .for_each(|island: &mut Population| {
-                    island.evolve(target, effective_rate, false);
+                    // 🔥 ここを true に変更: 島内も並列化
+                    island.evolve(target, effective_rate, true);
                 });
         } else {
             for island in self.islands.iter_mut() {
@@ -111,17 +125,23 @@ impl GeneticModel {
     }
 }
 
+// 🔥 変異率の調整を改善（より細かく段階的に）
 fn calculate_effective_mutation_rate(current_fitness: f64, base_rate: f64, is_auto: bool) -> f64 {
     if !is_auto {
         return base_rate;
     }
 
-    if 0.98 < current_fitness {
-        0.001
-    } else if 0.95 < current_fitness {
-        0.005
-    } else if 0.90 < current_fitness {
-        0.01
+    // 97%以降は非常に細かい調整が必要
+    if current_fitness > 0.99 {
+        base_rate * 0.3 // 70%削減
+    } else if current_fitness > 0.98 {
+        base_rate * 0.5 // 50%削減
+    } else if current_fitness > 0.97 {
+        base_rate * 0.7 // 30%削減
+    } else if current_fitness > 0.95 {
+        base_rate * 0.8 // 20%削減
+    } else if current_fitness > 0.90 {
+        base_rate * 0.9 // 10%削減
     } else {
         base_rate
     }
@@ -134,27 +154,33 @@ mod test {
     #[test]
     fn test_mutation_rate_auto_off() {
         let rate = calculate_effective_mutation_rate(0.99, 0.05, false);
-
         assert_eq!(rate, 0.05);
     }
 
     #[test]
     fn test_mutation_rate_auto_on_low_fitness() {
         let rate = calculate_effective_mutation_rate(0.5, 0.05, true);
-
         assert_eq!(rate, 0.05);
     }
 
     #[test]
     fn test_mutation_rate_auto_on_high_fitness() {
         let rate = calculate_effective_mutation_rate(0.96, 0.05, true);
-
-        assert_eq!(rate, 0.005);
+        assert_eq!(rate, 0.015);
     }
+
     #[test]
     fn test_mutation_rate_auto_on_very_high_fitness() {
         let rate = calculate_effective_mutation_rate(0.99, 0.05, true);
+        assert_eq!(rate, 0.005);
+    }
 
-        assert_eq!(rate, 0.001);
+    #[test]
+    fn test_mutation_rate_gradient() {
+        assert_eq!(calculate_effective_mutation_rate(0.5, 0.1, true), 0.1);
+        assert_eq!(calculate_effective_mutation_rate(0.85, 0.1, true), 0.07);
+        assert_eq!(calculate_effective_mutation_rate(0.92, 0.1, true), 0.05);
+        assert_eq!(calculate_effective_mutation_rate(0.96, 0.1, true), 0.03);
+        assert_eq!(calculate_effective_mutation_rate(0.99, 0.1, true), 0.01);
     }
 }

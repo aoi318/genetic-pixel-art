@@ -5,8 +5,8 @@ type Props = {
     isPlaying: boolean;
     onTogglePlay: () => void;
     onReset: () => void;
-    speed: number;
-    setSpeed: (speed: number) => void;
+    updateInterval: number;
+    setUpdateInterval: (interval: number) => void;
     generation: number;
     fitness: number;
     populationSize: number;
@@ -26,8 +26,8 @@ export const ControlPanel: React.FC<Props> = ({
     isPlaying,
     onTogglePlay,
     onReset,
-    speed,
-    setSpeed,
+    updateInterval,
+    setUpdateInterval,
     generation,
     fitness,
     populationSize,
@@ -56,7 +56,7 @@ export const ControlPanel: React.FC<Props> = ({
             </div>
             <div style={styles.statItem}>
                 <span style={styles.label}>Speed:</span>
-                <span style={styles.value}>{fps} FPS</span>
+                <span style={styles.value}>{fps} gen/s</span>
             </div>
             <div style={styles.controlsGroup}>
                 <button onClick={onTogglePlay} style={styles.button}>
@@ -79,17 +79,23 @@ export const ControlPanel: React.FC<Props> = ({
                 </label>
             </div>
 
-            {/* 速度スライダー */}
+            {/* 表示間隔スライダー */}
             <div style={styles.sliderGroup}>
-                <label style={styles.label}>Speed: x{speed}</label>
+                <label style={styles.label}>
+                    Display Interval: every {updateInterval} gen
+                    {updateInterval === 1 && ' (Real-time)'}
+                </label>
                 <input
                     type="range"
                     min="1"
-                    max="50"
-                    value={speed}
-                    onChange={(e) => setSpeed(Number(e.target.value))}
+                    max="100"
+                    value={updateInterval}
+                    onChange={(e) => setUpdateInterval(Number(e.target.value))}
                     style={styles.slider}
                 />
+                <div style={styles.hint}>
+                    Higher values = faster evolution, less visual updates
+                </div>
             </div>
 
             <hr style={styles.divider} />
@@ -228,6 +234,11 @@ const styles = {
     slider: {
         width: '100%',
         cursor: 'pointer',
+    },
+    hint: {
+        fontSize: '0.7rem',
+        color: '#999',
+        fontStyle: 'italic',
     },
     select: {
         width: '100%',

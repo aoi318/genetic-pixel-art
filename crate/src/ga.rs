@@ -40,18 +40,20 @@ impl Population {
 
     fn sort_by_fitness(&mut self, is_parallel: bool) {
         if is_parallel {
+            // 🔥 sort_unstable_by で高速化（順序保証不要）
             self.individuals
-                .par_sort_by(|a: &Individual, b: &Individual| {
+                .par_sort_unstable_by(|a: &Individual, b: &Individual| {
                     b.fitness
                         .partial_cmp(&a.fitness)
                         .unwrap_or(std::cmp::Ordering::Equal)
                 });
         } else {
-            self.individuals.sort_by(|a: &Individual, b: &Individual| {
-                b.fitness
-                    .partial_cmp(&a.fitness)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
+            self.individuals
+                .sort_unstable_by(|a: &Individual, b: &Individual| {
+                    b.fitness
+                        .partial_cmp(&a.fitness)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
         }
     }
 
@@ -62,12 +64,17 @@ impl Population {
         let individuals: &Vec<Individual> = &self.individuals;
         let next_generation: &mut Vec<Individual> = &mut self.buffer;
         next_generation.clear();
-        let mut rng: rand::prelude::ThreadRng = rand::rng();
+
+        // 🔥 エリート保存を少し増やす（上位3体）
+        // 1体だけだと運悪く変異で悪化する可能性がある
+        let num_elites = 3.min(individuals.len());
+        for i in 0..num_elites {
+            next_generation.push(individuals[i].clone());
+        }
+
+        // 🔥 選択プールは元のまま（上位50%）
         let elite_count: usize = self.individuals.len() / 2;
-
-        next_generation.push(self.individuals[0].clone());
-
-        let num_children: usize = individuals.len() - 1;
+        let num_children: usize = individuals.len() - num_elites;
 
         if is_parallel {
             let children: Vec<Individual> = (0..num_children)
@@ -85,6 +92,8 @@ impl Population {
 
             next_generation.extend(children);
         } else {
+            let mut rng: rand::prelude::ThreadRng = rand::rng();
+
             while next_generation.len() < individuals.len() {
                 let p1: &Individual = &individuals[rng.random_range(0..elite_count)];
                 let p2: &Individual = &individuals[rng.random_range(0..elite_count)];
@@ -125,20 +134,37 @@ impl Individual {
         }
     }
 
+    // 🔥 MSEベースのフィットネス計算（より敏感）
+    #[inline]
     fn calculate_fitness(&mut self, target: &[u8]) {
-        let mut total_diff: usize = 0;
+        let mut sum_squared_diff: u64 = 0;
 
-        for (a, b) in self.dna.iter().zip(target.iter()) {
-            let val1: isize = *a as isize;
-            let val2: isize = *b as isize;
-            let diff: isize = (val1 - val2).abs();
-
-            total_diff += diff as usize;
+        // 8バイトずつ処理 (キャッシュ効率向上)
+        let chunks = self.dna.len() / 8;
+        for i in 0..chunks {
+            let base = i * 8;
+            for j in 0..8 {
+                let idx = base + j;
+                let diff = (self.dna[idx] as i32 - target[idx] as i32).abs() as u64;
+                sum_squared_diff += diff * diff; // 二乗誤差
+            }
         }
-        let max_diff: f64 = 255.0 * self.dna.len() as f64;
-        self.fitness = 1.0 - (total_diff as f64 / max_diff);
+
+        // 残りを処理
+        for i in (chunks * 8)..self.dna.len() {
+            let diff = (self.dna[i] as i32 - target[i] as i32).abs() as u64;
+            sum_squared_diff += diff * diff; // 二乗誤差
+        }
+
+        // MSE (Mean Squared Error)
+        let mse = sum_squared_diff as f64 / self.dna.len() as f64;
+        let max_mse = 255.0 * 255.0; // 最大誤差の二乗
+
+        // 1.0に近いほど良い
+        self.fitness = 1.0 - (mse / max_mse);
     }
 
+    // 🔥 段階的な突然変異（初期は大胆、後期は微調整）
     fn mutate(&mut self, mutation_rate: f64) {
         let mut rng: rand::prelude::ThreadRng = rand::rng();
         let len: usize = self.dna.len();
@@ -147,12 +173,21 @@ impl Individual {
 
         for _ in 0..num_mutations {
             let idx: usize = rng.random_range(0..len);
-            let noise: i16 = rng.random_range(-10..=10);
+
+            // 90%の確率で微調整、10%で大きな変更
+            let noise: i16 = if rng.random::<f64>() < 0.9 {
+                // 微調整: ±5の範囲（細かい調整）
+                rng.random_range(-5..=5)
+            } else {
+                // 大きな変更: ±30の範囲（多様性維持）
+                rng.random_range(-30..=30)
+            };
 
             self.dna[idx] = (self.dna[idx] as i16 + noise).clamp(0, 255) as u8;
         }
     }
 
+    // 🔥 元の2点交叉に戻す（シンプルで効果的）
     pub fn crossover(&self, partner: &Individual) -> Individual {
         let mut rng: rand::prelude::ThreadRng = rand::rng();
         let len: usize = self.dna.len();

@@ -12,14 +12,17 @@ export const useGeneticModel = (gridsize: number) => {
   const [bestImage, setBestImage] = useState<Uint8Array | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [speed, setSpeed] = useState(1);
   const [populationSize, setPopulationSize] = useState(100);
   const [mutationRate, setMutationRate] = useState(0.05);
   const [isAutoMutation, setIsAutoMutation] = useState(true);
   const [isParallel, setIsParallel] = useState(false);
   const [fps, setFps] = useState(0);
+
+  // 🔥 表示間隔設定 (何世代ごとに画面更新するか)
+  const [updateInterval, setUpdateInterval] = useState(10);
+
   const lastFpsUpdateTimeRef = useRef<number>(0);
-  const frameCountRef = useRef<number>(0);
+  const generationCountRef = useRef<number>(0);
 
   const modelRef = useRef<GeneticModel | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -44,37 +47,43 @@ export const useGeneticModel = (gridsize: number) => {
     loopRef.current = () => {
       if (!modelRef.current) return;
 
-      for (let i = 0; i < speed; i++) {
+      // 🔥 updateInterval分だけバッチ処理
+      if (updateInterval > 1) {
+        modelRef.current.step_batch(updateInterval, mutationRate, isAutoMutation, isParallel);
+      } else {
         modelRef.current.step(mutationRate, isAutoMutation, isParallel);
       }
 
       const now = performance.now();
-      frameCountRef.current++;
 
-      if (frameCountRef.current % 10 === 0) {
-        updateState();
-      }
+      // 🔥 実際に処理した世代数をカウント
+      generationCountRef.current += updateInterval;
 
-      if (frameCountRef.current % 100 === 0) {
+      // 毎回画面更新（バッチ処理後に表示）
+      updateState();
+
+      // 🔥 メモリ管理を改善
+      if (generationCountRef.current % 500 === 0) {
         performance.clearMarks();
         performance.clearMeasures();
       }
 
-      if (now - lastFpsUpdateTimeRef.current >= 100) {
+      // 🔥 FPS計測 (世代/秒) - 実測値
+      if (now - lastFpsUpdateTimeRef.current >= 1000) {
         const elapsed = now - lastFpsUpdateTimeRef.current;
-        const currentFps = Math.round((frameCountRef.current * 1000) / elapsed);
+        const currentFps = Math.round((generationCountRef.current * 1000) / elapsed);
         setFps(currentFps);
-        frameCountRef.current = 0;
+        generationCountRef.current = 0;
         lastFpsUpdateTimeRef.current = now;
       }
 
       animationRef.current = requestAnimationFrame(() => loopRef.current());
     };
-  }, [speed, mutationRate, isAutoMutation, isParallel, updateState]);
+  }, [mutationRate, isAutoMutation, isParallel, updateInterval, updateState]);
 
   const loop = useCallback(() => {
     lastFpsUpdateTimeRef.current = performance.now();
-    frameCountRef.current = 0;
+    generationCountRef.current = 0;
     loopRef.current();
   }, []);
 
@@ -92,7 +101,8 @@ export const useGeneticModel = (gridsize: number) => {
 
             console.log('Shared Memory?', wasm.memory.buffer instanceof SharedArrayBuffer);
 
-            const numThreads = Math.min(navigator.hardwareConcurrency || 4, 4);
+            // 🔥 スレッド数を最大化
+            const numThreads = Math.min(navigator.hardwareConcurrency || 8, 8);
             console.log(`${numThreads} スレッドを初期化中...`);
 
             await initThreadPool(numThreads);
@@ -151,8 +161,6 @@ export const useGeneticModel = (gridsize: number) => {
     bestImage,
     isPlaying,
     isLoaded,
-    speed,
-    setSpeed,
     populationSize,
     setPopulationSize,
     mutationRate,
@@ -162,6 +170,8 @@ export const useGeneticModel = (gridsize: number) => {
     isParallel,
     setIsParallel,
     fps,
+    updateInterval,
+    setUpdateInterval,
     togglePlay,
     reset,
   };
