@@ -39,7 +39,6 @@ impl GeneticModel {
         }
     }
 
-    // 🔥 新機能: バッチ処理
     pub fn step_batch(
         &mut self,
         batch_size: usize,
@@ -63,7 +62,6 @@ impl GeneticModel {
             self.islands
                 .par_iter_mut()
                 .for_each(|island: &mut Population| {
-                    // 🔥 ここを true に変更: 島内も並列化
                     island.evolve(target, effective_rate, true);
                 });
         } else {
@@ -104,7 +102,7 @@ impl GeneticModel {
     }
 
     fn migrate(&mut self) {
-        let num_islands = self.islands.len();
+        let num_islands: usize = self.islands.len();
         if num_islands < 2 {
             return;
         }
@@ -125,23 +123,21 @@ impl GeneticModel {
     }
 }
 
-// 🔥 変異率の調整を改善（より細かく段階的に）
 fn calculate_effective_mutation_rate(current_fitness: f64, base_rate: f64, is_auto: bool) -> f64 {
     if !is_auto {
         return base_rate;
     }
 
-    // 97%以降は非常に細かい調整が必要
     if current_fitness > 0.99 {
-        base_rate * 0.3 // 70%削減
+        base_rate * 0.3
     } else if current_fitness > 0.98 {
-        base_rate * 0.5 // 50%削減
+        base_rate * 0.5
     } else if current_fitness > 0.97 {
-        base_rate * 0.7 // 30%削減
+        base_rate * 0.7
     } else if current_fitness > 0.95 {
-        base_rate * 0.8 // 20%削減
+        base_rate * 0.8
     } else if current_fitness > 0.90 {
-        base_rate * 0.9 // 10%削減
+        base_rate * 0.9
     } else {
         base_rate
     }
