@@ -108,31 +108,26 @@ impl GeneticModel {
     }
 
     fn migrate(&mut self) {
-        // 分解してそれぞれ可変参照を取得
         let GeneticModel {
             ref mut islands,
             ref mut migration_buffer,
             ..
         } = self;
 
-        let num_islands = islands.len();
+        let num_islands: usize = islands.len();
         if num_islands < 2 {
             return;
         }
 
-        // 1. 各島のエリート(index 0)をバッファにコピー
         for (i, island) in islands.iter().enumerate() {
-            // さっき作った copy_from を使う！
             migration_buffer[i].copy_from(&island.individuals[0]);
         }
 
-        // 2. バッファの内容を次の島の最悪個体にコピー
         for i in 0..num_islands {
-            let target_idx = (i + 1) % num_islands;
-            let target_island = &mut islands[target_idx];
-            let worst_idx = target_island.individuals.len() - 1;
+            let target_idx: usize = (i + 1) % num_islands;
+            let target_island: &mut Population = &mut islands[target_idx];
+            let worst_idx: usize = target_island.individuals.len() - 1;
 
-            // バッファからコピー
             target_island.individuals[worst_idx].copy_from(&migration_buffer[i]);
         }
     }

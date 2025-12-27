@@ -1,5 +1,3 @@
-// src/hooks/useGeneticModel.ts
-
 import { useEffect, useRef, useState, useCallback } from 'react';
 import init, { GeneticModel, initThreadPool } from 'crate';
 import { loadTargetImage } from '../utils/imageLoader';
@@ -18,8 +16,19 @@ export const useGeneticModel = (gridsize: number) => {
   const [isParallel, setIsParallel] = useState(false);
   const [fps, setFps] = useState(0);
 
-  // 🔥 表示間隔設定 (何世代ごとに画面更新するか)
+  const [isBenchmarkMode, setIsBenchmarkMode] = useState(false);
+  const [benchmarkTarget, setBenchmarkTarget] = useState(95);
+  const [benchmarkResults, setBenchmarkResults] = useState<{ time: number; generation: number } | null>(null);
+  const benchmarkStartTimeRef = useRef<number>(0);
+
   const [updateInterval, setUpdateInterval] = useState(10);
+
+  const [isVisualUpdateEnabled, setIsVisualUpdateEnabled] = useState(true);
+  const isVisualUpdateEnabledRef = useRef(isVisualUpdateEnabled);
+
+  useEffect(() => {
+    isVisualUpdateEnabledRef.current = isVisualUpdateEnabled;
+  }, [isVisualUpdateEnabled]);
 
   const lastFpsUpdateTimeRef = useRef<number>(0);
   const generationCountRef = useRef<number>(0);
@@ -29,9 +38,13 @@ export const useGeneticModel = (gridsize: number) => {
 
   const updateState = useCallback(() => {
     if (!modelRef.current) return;
+
     setGeneration(modelRef.current.get_generation());
     setFitness(modelRef.current.get_best_fitness());
-    setBestImage(modelRef.current.get_best_image());
+
+    if (isVisualUpdateEnabledRef.current) {
+      setBestImage(modelRef.current.get_best_image());
+    }
   }, []);
 
   const stopLoop = useCallback(() => {
@@ -47,28 +60,47 @@ export const useGeneticModel = (gridsize: number) => {
     loopRef.current = () => {
       if (!modelRef.current) return;
 
-      // 🔥 updateInterval分だけバッチ処理
-      if (updateInterval > 1) {
-        modelRef.current.step_batch(updateInterval, mutationRate, isAutoMutation, isParallel);
+      const batchSize = isVisualUpdateEnabledRef.current ? updateInterval : 500;
+
+      if (batchSize > 1) {
+        modelRef.current.step_batch(batchSize, mutationRate, isAutoMutation, isParallel);
       } else {
         modelRef.current.step(mutationRate, isAutoMutation, isParallel);
       }
 
       const now = performance.now();
 
-      // 🔥 実際に処理した世代数をカウント
-      generationCountRef.current += updateInterval;
+      generationCountRef.current += batchSize;
 
-      // 毎回画面更新（バッチ処理後に表示）
       updateState();
 
-      // 🔥 メモリ管理を改善
+      if (isBenchmarkMode && !benchmarkResults) {
+        const currentFitness = modelRef.current.get_best_fitness();
+        const targetFitness = benchmarkTarget / 100;
+
+        if (currentFitness >= targetFitness) {
+          const elapsedTime = (now - benchmarkStartTimeRef.current) / 1000;
+          const currentGeneration = modelRef.current.get_generation();
+
+          setBenchmarkResults({
+            time: elapsedTime,
+            generation: currentGeneration,
+          });
+
+          setIsPlaying(false);
+
+          if (!isVisualUpdateEnabledRef.current && modelRef.current) {
+            setBestImage(modelRef.current.get_best_image());
+          }
+          return;
+        }
+      }
+
       if (generationCountRef.current % 500 === 0) {
         performance.clearMarks();
         performance.clearMeasures();
       }
 
-      // 🔥 FPS計測 (世代/秒) - 実測値
       if (now - lastFpsUpdateTimeRef.current >= 1000) {
         const elapsed = now - lastFpsUpdateTimeRef.current;
         const currentFps = Math.round((generationCountRef.current * 1000) / elapsed);
@@ -79,13 +111,26 @@ export const useGeneticModel = (gridsize: number) => {
 
       animationRef.current = requestAnimationFrame(() => loopRef.current());
     };
-  }, [mutationRate, isAutoMutation, isParallel, updateInterval, updateState]);
+  }, [mutationRate, isAutoMutation, isParallel, updateInterval, updateState, isBenchmarkMode, benchmarkTarget, benchmarkResults]);
 
-  const loop = useCallback(() => {
+  const startLoop = useCallback(() => {
     lastFpsUpdateTimeRef.current = performance.now();
     generationCountRef.current = 0;
+
+    if (isBenchmarkMode) {
+      benchmarkStartTimeRef.current = performance.now();
+    }
+
     loopRef.current();
-  }, []);
+  }, [isBenchmarkMode]);
+
+  useEffect(() => {
+    if (isPlaying) {
+      startLoop();
+    } else {
+      stopLoop();
+    }
+  }, [isPlaying, startLoop, stopLoop]);
 
   useEffect(() => {
     const setup = async () => {
@@ -95,16 +140,11 @@ export const useGeneticModel = (gridsize: number) => {
             if (typeof SharedArrayBuffer === 'undefined') {
               throw new Error('SharedArrayBuffer がサポートされていません。CORS ヘッダーを確認してください。');
             }
-
             console.log('WASM を初期化中...');
             const wasm = await init(`${import.meta.env.BASE_URL}crate_bg.wasm`);
-
             console.log('Shared Memory?', wasm.memory.buffer instanceof SharedArrayBuffer);
-
-            // 🔥 スレッド数を最大化
             const numThreads = Math.min(navigator.hardwareConcurrency || 8, 8);
             console.log(`${numThreads} スレッドを初期化中...`);
-
             await initThreadPool(numThreads);
             console.log('スレッドプール初期化完了');
           })();
@@ -129,21 +169,18 @@ export const useGeneticModel = (gridsize: number) => {
     return () => stopLoop();
   }, [populationSize, gridsize, stopLoop, updateState]);
 
-  useEffect(() => {
-    if (isPlaying) {
-      loop();
-    } else {
-      stopLoop();
+  const togglePlay = () => {
+    if (!isPlaying && isBenchmarkMode) {
+      setBenchmarkResults(null);
     }
-    return () => stopLoop();
-  }, [isPlaying, loop, stopLoop]);
-
-  const togglePlay = () => setIsPlaying((prev) => !prev);
+    setIsPlaying((prev) => !prev);
+  };
 
   const reset = async () => {
     stopLoop();
     setIsPlaying(false);
     setFps(0);
+    setBenchmarkResults(null);
 
     const targetUrl = `${import.meta.env.BASE_URL}target.png`;
     const targetData = await loadTargetImage(targetUrl, gridsize, gridsize);
@@ -172,7 +209,14 @@ export const useGeneticModel = (gridsize: number) => {
     fps,
     updateInterval,
     setUpdateInterval,
+    isBenchmarkMode,
+    setIsBenchmarkMode,
+    benchmarkTarget,
+    setBenchmarkTarget,
+    benchmarkResults,
     togglePlay,
     reset,
+    isVisualUpdateEnabled,
+    setIsVisualUpdateEnabled,
   };
 };

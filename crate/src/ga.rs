@@ -137,12 +137,12 @@ impl Individual {
         }
 
         for i in (chunks * 8)..self.dna.len() {
-            let diff = (self.dna[i] as i32 - target[i] as i32).abs() as u64;
+            let diff: u64 = (self.dna[i] as i32 - target[i] as i32).abs() as u64;
             sum_squared_diff += diff * diff;
         }
 
-        let mse = sum_squared_diff as f64 / self.dna.len() as f64;
-        let max_mse = 255.0 * 255.0;
+        let mse: f64 = sum_squared_diff as f64 / self.dna.len() as f64;
+        let max_mse: f64 = 255.0 * 255.0;
 
         self.fitness = 1.0 - (mse / max_mse);
     }

@@ -1,5 +1,3 @@
-// src/components/MosaicCanvas.tsx
-
 import React, { useEffect, useRef } from 'react';
 
 type Props = {
@@ -47,11 +45,9 @@ export const MosaicCanvas: React.FC<Props> = ({
             ref={canvasRef}
             width={width}
             height={height}
-            className={className}
+            className={`w-full max-w-[320px] aspect-square rounded-xl shadow-sm bg-gray-100 image-pixelated ${className || ''}`}
             style={{
                 imageRendering: 'pixelated',
-                width: '320px',
-                height: '320px'
             }}
         />
     );
