@@ -60,44 +60,41 @@ impl Population {
         self.compute_fitnesses(target, is_parallel);
         self.sort_by_fitness(is_parallel);
 
-        let individuals: &Vec<Individual> = &self.individuals;
-        let next_generation: &mut Vec<Individual> = &mut self.buffer;
-        next_generation.clear();
+        let Population {
+            ref individuals,
+            ref mut buffer,
+            ..
+        } = self;
 
         let num_elites: usize = 3.min(individuals.len());
         for i in 0..num_elites {
-            next_generation.push(individuals[i].clone());
+            buffer[i].dna.copy_from_slice(&individuals[i].dna);
+            buffer[i].fitness = individuals[i].fitness;
         }
 
-        let elite_count: usize = self.individuals.len() / 2;
-        let num_children: usize = individuals.len() - num_elites;
+        let elite_count: usize = individuals.len() / 2;
 
         if is_parallel {
-            let children: Vec<Individual> = (0..num_children)
-                .into_par_iter()
-                .map(|_| {
+            buffer
+                .par_iter_mut()
+                .skip(num_elites)
+                .for_each(|child: &mut Individual| {
                     let mut rng: rand::prelude::ThreadRng = rand::rng();
                     let p1: &Individual = &individuals[rng.random_range(0..elite_count)];
                     let p2: &Individual = &individuals[rng.random_range(0..elite_count)];
 
-                    let mut child: Individual = p1.crossover(p2);
+                    p1.crossover_into(p2, child);
                     child.mutate(mutation_rate);
-                    child
-                })
-                .collect();
-
-            next_generation.extend(children);
+                });
         } else {
-            let mut rng: rand::prelude::ThreadRng = rand::rng();
-
-            while next_generation.len() < individuals.len() {
+            buffer.iter_mut().skip(num_elites).for_each(|child| {
+                let mut rng: rand::prelude::ThreadRng = rand::rng();
                 let p1: &Individual = &individuals[rng.random_range(0..elite_count)];
                 let p2: &Individual = &individuals[rng.random_range(0..elite_count)];
 
-                let mut child: Individual = p1.crossover(p2);
+                p1.crossover_into(p2, child);
                 child.mutate(mutation_rate);
-                next_generation.push(child);
-            }
+            });
         }
 
         std::mem::swap(&mut self.individuals, &mut self.buffer);
@@ -113,7 +110,6 @@ impl Population {
 pub struct Individual {
     pub dna: Vec<u8>,
     fitness: f64,
-    length: usize,
 }
 
 impl Individual {
@@ -123,11 +119,7 @@ impl Individual {
         let mut rng: rand::prelude::ThreadRng = rand::rng();
         let dna: Vec<u8> = (0..size).map(|_| rng.random_range(0..=255)).collect();
 
-        Self {
-            dna,
-            fitness: 0.0,
-            length,
-        }
+        Self { dna, fitness: 0.0 }
     }
 
     #[inline]
@@ -174,25 +166,6 @@ impl Individual {
         }
     }
 
-    pub fn crossover(&self, partner: &Individual) -> Individual {
-        let mut rng: rand::prelude::ThreadRng = rand::rng();
-        let len: usize = self.dna.len();
-
-        let mut new_dna: Vec<u8> = self.dna.clone();
-
-        let p1: usize = rng.random_range(0..len);
-        let p2: usize = rng.random_range(0..len);
-        let (start, end) = if p1 < p2 { (p1, p2) } else { (p2, p1) };
-
-        new_dna[start..end].copy_from_slice(&partner.dna[start..end]);
-
-        Individual {
-            dna: new_dna,
-            fitness: 0.0,
-            length: self.length,
-        }
-    }
-
     pub fn crossover_into(&self, partner: &Individual, child: &mut Individual) {
         let mut rng: rand::prelude::ThreadRng = rand::rng();
         let len: usize = self.dna.len();
@@ -205,6 +178,19 @@ impl Individual {
         let (start, end) = if p1 < p2 { (p1, p2) } else { (p2, p1) };
 
         child.dna[start..end].copy_from_slice(&partner.dna[start..end]);
+    }
+
+    pub fn copy_from(&mut self, other: &Individual) {
+        self.dna.copy_from_slice(&other.dna);
+        self.fitness = other.fitness;
+    }
+
+    pub(crate) fn new_empty(length: usize) -> Self {
+        let size: usize = length * length * 4;
+        Self {
+            dna: vec![0; size],
+            fitness: 0.0,
+        }
     }
 }
 
@@ -289,24 +275,6 @@ mod tests {
     }
 
     #[test]
-    fn test_crossover() {
-        let mut parent_a: Individual = Individual::new(32);
-        parent_a.dna = vec![0u8; 4096];
-
-        let mut parent_b: Individual = Individual::new(32);
-        parent_b.dna = vec![255u8; 4096];
-
-        let child: Individual = parent_a.crossover(&parent_b);
-
-        let has_zero: bool = child.dna.iter().any(|&x| x == 0);
-        let has_255: bool = child.dna.iter().any(|&x| x == 255);
-
-        assert!(has_zero, "Child should inherit some DNA from parent A (0)");
-        assert!(has_255, "Child should inherit some DNA from parent B (255)");
-        assert_eq!(child.dna.len(), 4096, "Child DNA size should be correct");
-    }
-
-    #[test]
     fn test_elitism() {
         let size: usize = 10;
         let mut pop: Population = Population::new(size, 32);
@@ -331,7 +299,6 @@ mod tests {
         let ind: Individual = Individual::new(length);
 
         assert_eq!(ind.dna.len(), 64 * 64 * 4);
-        assert_eq!(ind.length, 64);
     }
 
     #[test]
@@ -362,5 +329,24 @@ mod tests {
         let has_zero: bool = child.dna.iter().any(|&x| x == 0);
         let has_255: bool = child.dna.iter().any(|&x| x == 255);
         assert!(has_zero || has_255, "DNA should be overwritten by parents");
+    }
+
+    #[test]
+    fn test_copy_from() {
+        let length: usize = 10;
+        let mut ind1: Individual = Individual::new(length);
+        ind1.dna.fill(10);
+        ind1.fitness = 0.5;
+
+        let mut ind2: Individual = Individual::new(length);
+        ind2.dna.fill(20);
+        ind2.fitness = 0.1;
+
+        ind2.copy_from(&ind1);
+
+        assert_eq!(ind2.dna, ind1.dna);
+        assert_eq!(ind2.fitness, ind1.fitness);
+
+        assert_eq!(ind1.dna[0], 10);
     }
 }

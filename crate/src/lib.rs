@@ -2,6 +2,7 @@
 
 mod ga;
 
+use ga::Individual;
 use ga::Population;
 use rayon::prelude::*;
 use wasm_bindgen::prelude::*;
@@ -17,6 +18,7 @@ extern "C" {
 pub struct GeneticModel {
     islands: Vec<Population>,
     target: Vec<u8>,
+    migration_buffer: Vec<Individual>,
 }
 
 #[wasm_bindgen]
@@ -28,14 +30,18 @@ impl GeneticModel {
         let num_islands: usize = 4;
         let size_per_island: usize = population_size / num_islands;
 
+        let mut migration_buffer: Vec<Individual> = Vec::with_capacity(num_islands);
+
         let mut islands: Vec<Population> = Vec::with_capacity(num_islands);
         for _ in 0..num_islands {
             islands.push(Population::new(size_per_island, length));
+            migration_buffer.push(Individual::new_empty(length));
         }
 
         Self {
             islands,
             target: target_vec,
+            migration_buffer,
         }
     }
 
@@ -102,23 +108,32 @@ impl GeneticModel {
     }
 
     fn migrate(&mut self) {
-        let num_islands: usize = self.islands.len();
+        // 分解してそれぞれ可変参照を取得
+        let GeneticModel {
+            ref mut islands,
+            ref mut migration_buffer,
+            ..
+        } = self;
+
+        let num_islands = islands.len();
         if num_islands < 2 {
             return;
         }
 
-        let elites: Vec<_> = self
-            .islands
-            .iter()
-            .map(|island: &Population| island.individuals[0].clone())
-            .collect();
+        // 1. 各島のエリート(index 0)をバッファにコピー
+        for (i, island) in islands.iter().enumerate() {
+            // さっき作った copy_from を使う！
+            migration_buffer[i].copy_from(&island.individuals[0]);
+        }
 
+        // 2. バッファの内容を次の島の最悪個体にコピー
         for i in 0..num_islands {
-            let target_idx: usize = (i + 1) % num_islands;
-            let target_island: &mut Population = &mut self.islands[target_idx];
+            let target_idx = (i + 1) % num_islands;
+            let target_island = &mut islands[target_idx];
+            let worst_idx = target_island.individuals.len() - 1;
 
-            let worst_idx: usize = target_island.individuals.len() - 1;
-            target_island.individuals[worst_idx] = elites[i].clone();
+            // バッファからコピー
+            target_island.individuals[worst_idx].copy_from(&migration_buffer[i]);
         }
     }
 }
@@ -179,5 +194,15 @@ mod test {
         assert!((calculate_effective_mutation_rate(0.975, 0.1, true) - 0.07).abs() < 1e-10);
         assert!((calculate_effective_mutation_rate(0.985, 0.1, true) - 0.05).abs() < 1e-10);
         assert!((calculate_effective_mutation_rate(0.995, 0.1, true) - 0.03).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_migrate_execution() {
+        let target: Vec<u8> = vec![0u8; 4096];
+        let mut model: GeneticModel = GeneticModel::new(&target, 100, 32);
+
+        model.migrate();
+
+        model.migrate();
     }
 }
